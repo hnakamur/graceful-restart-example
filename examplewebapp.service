@@ -4,12 +4,10 @@ After=network.target remote-fs.target nss-lookup.target
 
 [Service]
 Type=simple
-ExecStart=/usr/local/gocode/bin/examplewebapp -daemon=false
+ExecStart=/usr/local/gocode/bin/examplewebapp -daemon=false -bind 0.0.0.0:7777
 
 #Type=forking
-#ExecStart=/usr/local/gocode/bin/examplewebapp -daemon=true
-##ExecReload=/bin/sh -c "/bin/kill -HUP `/bin/cat /tmp/exampleapp.pid`"
-##ExecStop=/bin/sh -c "/bin/kill -TERM `/bin/cat /tmp/exampleapp.pid`"
+#ExecStart=/usr/local/gocode/bin/examplewebapp -daemon=true -bind 0.0.0.0:7777
 #PIDFile=/tmp/exampleapp.pid
 
 [Install]

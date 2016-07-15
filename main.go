@@ -7,16 +7,22 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"os/signal"
 	"syscall"
 	"time"
 
 	"github.com/lomik/go-daemon"
+	"github.com/zenazn/goji"
+	"github.com/zenazn/goji/graceful"
+	"github.com/zenazn/goji/web"
 )
 
-func sleepHandleFunc(w http.ResponseWriter, r *http.Request) {
+func getSleep(w http.ResponseWriter, r *http.Request) {
 	time.Sleep(3 * time.Second)
 	fmt.Fprintf(w, "Hello, %q\n", html.EscapeString(r.URL.Path))
+}
+
+func route(m *web.Mux) {
+	m.Get("/sleep", getSleep)
 }
 
 func main() {
@@ -57,25 +63,8 @@ func main() {
 	log.SetFlags(log.LstdFlags | log.Lmicroseconds)
 	log.Printf("examplewebapp start#2. daemon=%v", isDaemon)
 
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, syscall.SIGINT, syscall.SIGHUP, syscall.SIGTERM, syscall.SIGUSR1, syscall.SIGUSR2)
-	go func() {
-		log.Println("Start signal handler goroutine")
-		for {
-			s := <-c
-			switch s {
-			case syscall.SIGINT, syscall.SIGHUP, syscall.SIGUSR1, syscall.SIGUSR2:
-				log.Println("Got signal:", s)
-			case syscall.SIGTERM:
-				log.Println("Got sigterm signal:", s)
-				os.Exit(0)
-			default:
-				log.Println("Got unexpected signal:", s)
-			}
-		}
-	}()
-
-	http.HandleFunc("/sleep", sleepHandleFunc)
-	log.Println("Start ListenAndServe")
-	log.Fatal(http.ListenAndServe(addr, nil))
+	route(goji.DefaultMux)
+	log.Println("Start goji.Serve")
+	graceful.AddSignal(syscall.SIGTERM)
+	goji.Serve()
 }
