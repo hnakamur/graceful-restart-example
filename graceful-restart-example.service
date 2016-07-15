@@ -1,0 +1,11 @@
+[Unit]
+Description=Example webapp
+After=network.target remote-fs.target nss-lookup.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/gocode/bin/start_server --port 7777 -- /usr/local/gocode/bin/graceful-restart-example
+ExecReload=/bin/kill -HUP $MAINPID
+
+[Install]
+WantedBy=multi-user.target

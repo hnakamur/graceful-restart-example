@@ -5,12 +5,13 @@ import (
 	"fmt"
 	"html"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"syscall"
 	"time"
 
-	"github.com/lomik/go-daemon"
+	"github.com/lestrrat/go-server-starter/listener"
 	"github.com/zenazn/goji"
 	"github.com/zenazn/goji/graceful"
 	"github.com/zenazn/goji/web"
@@ -22,37 +23,15 @@ func getSleep(w http.ResponseWriter, r *http.Request) {
 }
 
 func route(m *web.Mux) {
-	m.Get("/sleep", getSleep)
+	m.Get("/sleep/:sleepid", getSleep)
 }
 
 func main() {
 	var addr string
 	flag.StringVar(&addr, "addr", ":7777", "listen address (host:port)")
-	var pidFileName string
-	flag.StringVar(&pidFileName, "pidfile", "/tmp/exampleapp.pid", "pid file path")
-	var isDaemon bool
-	flag.BoolVar(&isDaemon, "daemon", false, "background runnning daemon")
 	var logPath string
-	flag.StringVar(&logPath, "log-path", "/tmp/examplewebapp.log", "log file path")
+	flag.StringVar(&logPath, "log-path", "/tmp/graceful-restart-example.log", "log file path")
 	flag.Parse()
-
-	log.Printf("examplewebapp start. daemon=%v", isDaemon)
-
-	if isDaemon == true {
-		dmn := new(daemon.Context)
-		child, _ := dmn.Reborn()
-
-		if child != nil {
-			return
-		} else {
-			_, err := daemon.CreatePidFile(pidFileName, 0644)
-			if err != nil {
-				log.Println("pidfile create error")
-				panic(err)
-			}
-			log.Println("start daemon child prossess")
-		}
-	}
 
 	logFile, err := os.OpenFile(logPath, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 	if err != nil {
@@ -61,10 +40,29 @@ func main() {
 	defer logFile.Close()
 	log.SetOutput(logFile)
 	log.SetFlags(log.LstdFlags | log.Lmicroseconds)
-	log.Printf("examplewebapp start#2. daemon=%v", isDaemon)
 
 	route(goji.DefaultMux)
-	log.Println("Start goji.Serve")
+
 	graceful.AddSignal(syscall.SIGTERM)
-	goji.Serve()
+
+	var l net.Listener
+	if os.Getenv("SERVER_STARTER_PORT") != "" {
+		listeners, err := listener.ListenAll()
+		if err != nil {
+			log.Printf("error in ListenAll. err=%s", err)
+			return
+		}
+		if len(listeners) == 0 {
+			log.Printf("no listeners")
+			return
+		}
+		log.Printf("listeners count=%d", len(listeners))
+		l = listeners[0]
+	} else {
+		l, err = net.Listen("tcp", addr)
+		if err != nil {
+			log.Printf("error in listen. err=%s", err)
+		}
+	}
+	goji.ServeListener(l)
 }
